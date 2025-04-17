@@ -10,7 +10,7 @@
 /* Токенизация */
 tokenize_atom(Atom, Tokens) :-
     downcase_atom(Atom, Lower),
-    split_string(Lower, " ", ".,?!–-()", Split),
+    split_string(Lower, " -", ".,?!–-()", Split),
     maplist(atom_string, Tokens, Split).
 
 /* -----------------------------
@@ -60,27 +60,27 @@ prep(для) --> [для].
 prep(с) --> [с].
 prep(за) --> [за].
 
-% Объекты (частичные)
-obj2(средства(для(приюта))) --> [средства], [для], [приюта].
-obj2(уход(за(животными), там)) --> [уходом], [за], [животными], time_adverb(там).
+% Объектные фрагменты
+object_part(Obj) --> [участие], prepositional_object(Obj).
+prepositional_object(участие(в(волонтерском, проекте), по(помощи, бездомным, животным))) -->
+    [в, волонтерском, проекте, по, помощи, бездомным, животным].
+obj2(средства(для(приюта))) --> [средства, для, приюта].
+obj2(уход(за(животными), там)) --> [с, уходом, за, животными, там].
 complex_obj(удовлетворение(от(того, что, делаем(мы, что_то(полезное, для(общества)))))) -->
-    [удовлетворение], [от], [того], [что], verb7(делаем), [что], [то], adjective(полезное), [для], [общества].
+    [удовлетворение, от, того, что], verb7(делаем), [что, то, полезное, для, общества].
 
-% Правила логического разбора для предложений
-логПредложение(на_днях(я, принял(участие(в(волонтерском, проекте), по(помощи, бездомным, животным))))) -->
-    [на, днях], subject(я), verb3(принял), [участие, в, волонтерском, проекте, по, помощи, бездомным, животным].
+% Правила логического разбора
+логПредложение(на_днях(я, принял(Obj))) -->
+    [на, днях], subject(я), verb3(принял), object_part(Obj).
 
 логПредложение( &&(собрали(мы, средства(для(приюта))), помогли(мы, уход(за(животными), там))) ) -->
-    subject(мы), verb4(собрали), obj2(средства(для(приюта))), conjunction(и), verb5(помогли),
-    [с], obj2(уход(за(животными), там)).
+    subject(мы), verb4(собрали), obj2(средства(для(приюта))), conjunction(и), verb5(помогли), obj2(уход(за(животными), там)).
 
-логПредложение( &&(было(работа, тяжелой), чувствовали(мы, удовлетворение(от(того, что, делаем(мы, что_то(полезное, для(общества))))))) ) -->
-    noun_subject(работа), verb_be(была), adjective(тяжелой), conjunction(но), subject(мы), verb6(чувствовали),
-    complex_obj(удовлетворение(от(того, что, делаем(мы, что_то(полезное, для(общества)))))).
+логПредложение( &&(была(работа, тяжелой), чувствовали(мы, удовлетворение(от(того, что, делаем(мы, что_то(полезное, для(общества))))))) ) -->
+    noun_subject(работа), verb_be(была), adjective(тяжелой), conjunction(но), subject(мы), verb6(чувствовали), complex_obj(удовлетворение(от(того, что, делаем(мы, что_то(полезное, для(общества)))))).
 
 логПредложение( &&(поддержали(местные_жители, инициативу(нашу)), принесли(местные_жители, еду(для(животных)))) ) -->
-    subject(местные_жители), verb8(поддержали), [нашу, инициативу], conjunction(и), verb9(принесли),
-    [еду, для, животных].
+    subject(местные_жители), verb8(поддержали), [нашу, инициативу], conjunction(и), verb9(принесли), [еду, для, животных].
 
 логПредложение(каждый(волонтер, ушел(с(с_чувством, гордости), за(свою, работу)))) -->
     subject(каждый_волонтер), verb10(ушел), [с, чувством, гордости, за, свою, работу].
@@ -94,7 +94,6 @@ parse_logical(Atom, Logic) :-
 /* -----------------------------
    2. Семантическая сеть
    ----------------------------- */
-% Лексикон для семантики
 pronoun(я). pronoun(мы).
 determiner(каждый). determiner(наш). determiner(нашу). determiner(свою).
 adverb(там).
@@ -106,36 +105,24 @@ time(на_днях).
 prep(на). prep(в). prep(по). prep(для). prep(с). prep(за).
 adjective(волонтерском). adjective(бездомным). adjective(тяжелой).
 adjective(полезное). adjective(местные). adjective(гордости).
-dop(я). dop(мы). dop(работа). dop(участие). dop(проект). dop(помощь). dop(животным).
+dop(работа). dop(участие). dop(проект). dop(помощь). dop(животным).
 dop(средства). dop(приюта). dop(уходом). dop(удовлетворение). dop(того). dop(общества).
 dop(инициативу). dop(еду). dop(волонтер). dop(чувством). dop(гордости).
 
-% Построение сети
 parse_sentence(Atom) :-
     tokenize_atom(Atom, Tokens),
     sentence(Tokens, _).
 
 sentence(S, S0) :-
-    split_sentence(S, Parts),
-    process_parts(Parts, S0, Nets),
-    maplist(draw_net, Nets).
+    split_sentence(S, Parts), process_parts(Parts, S0, Nets), maplist(draw_net, Nets).
 
-split_sentence(S, Parts) :-
-    append(P, [C|Rest], S), conjunction(C),
-    split_sentence(Rest, Sub), Parts=[P|Sub].
+split_sentence(S, Parts) :- append(P, [C|Rest], S), conjunction(C), split_sentence(Rest, Sub), Parts=[P|Sub].
 split_sentence(S, [S]) :- \+ (member(X,S), conjunction(X)).
 
-process_parts([Part], _, [Net]) :- sentence_part(Part, _, Net).
-process_parts([P|Rest], _, [Net|Nets]) :-
-    sentence_part(P, _, Net), Net=_-Links,
-    (member(agent-A,Links)->true;A=none),
-    process_parts_with_agent(Rest, A, Nets).
-
+process_parts([P],_,[Net]) :- sentence_part(P,_,Net).
+process_parts([P|Rest],_,[Net|Nets]) :- sentence_part(P,_,Net), Net=_-Links,(member(agent-A,Links)->true;A=none),process_parts_with_agent(Rest,A,Nets).
 process_parts_with_agent([],_,[]).
-process_parts_with_agent([P|Rest], Prev, [Net|Nets]) :-
-    sentence_part_with_fallback_agent(P, _, Prev, Net), Net=_-Links,
-    (member(agent-A,Links)->true;A=Prev),
-    process_parts_with_agent(Rest, A, Nets).
+process_parts_with_agent([P|Rest],Prev,[Net|Nets]) :- sentence_part_with_fallback_agent(P,_,Prev,Net),Net=_-Links,(member(agent-A,Links)->true;A=Prev),process_parts_with_agent(Rest,A,Nets).
 
 sentence_part(S,S0,Act-Links) :-
     (time(S,S1,T)->L1=[time-T];S1=S,L1=[]),
@@ -159,15 +146,15 @@ time([X|S0],S0,X) :- time(X).
 place([Prep,N|S0],S0,[Prep,N]) :- prep(Prep), dop(N).
 place([Prep,A,N|S0],S0,[Prep,A,N]) :- prep(Prep), adjective(A), dop(N).
 
-object_full(S,S0,OF) :-
-    object_base(S,S1,B),
-    (object_relative(S1,S0,Rel)->OF=[B,Rel];S0=S1,OF=B).
-object_base([участие,в,волонтерском,проекте,по,помощи,бездомным,животным|S0],S0,[[участие,в,волонтерском,проекте],[по,помощи,бездомным,животным]]).
+object_full(S,S0,OF) :- object_base(S,S1,B), (object_relative(S1,S0,Rel)->OF=[B,Rel];S0=S1,OF=B).
+object_base([Det,N|S0],S0,[Det,N]) :- determiner(Det), dop(N).
+object_base([участие,в,волонтерском,проекте,по,помощи,бездомним,животным|S0],S0,[[участие,в,волонтерском,проекте],[по,помощи,бездомним,животным]]).
 object_base([N,P,A1,A2,N2|S0],S0,[N,P,A1,A2,N2]) :- dop(N), prep(P), adjective(A1), adjective(A2), dop(N2).
 object_base([N,P,N2|S0],S0,[N,P,N2]) :- dop(N), prep(P), dop(N2).
 object_base([N,A,N2|S0],S0,[N,A,N2]) :- dop(N), adjective(A), dop(N2).
 object_base([N|S0],S0,[N]) :- dop(N).
 object_base([P,O|S0],S0,[P,O]) :- prep(P), dop(O).
+
 object_relative([которые,V,A,N,N2|S0],S0,rel([V,A,N,N2])) :- verb(V), adjective(A), dop(N), dop(N2).
 
 draw_net(Action-Links) :- write('Семантическая сеть:'), nl, portray_clause(Action-Links).
@@ -179,7 +166,7 @@ combined_parse(Atom, Logic, SemNet) :-
     parse_logical(Atom, Logic),
     tokenize_atom(Atom, Tokens),
     ( build_semantic_network(Tokens, SemNet) -> true ; SemNet = 'Не удалось построить семантическую сеть' ).
-build_semantic_network(S, Nets) :- split_sentence(S, Parts), process_parts(Parts, S, Nets).
+build_semantic_network(S,Nets) :- split_sentence(S,Parts), process_parts(Parts,S,Nets).
 
 /* -----------------------------
    4. Главный цикл
@@ -192,12 +179,11 @@ main :-
         combined_parse(Sentence, Logic, SemNets),
         write('---'), nl,
         write('Логическая форма:'), nl,
-        portray_clause(Logic),
+        portray_clause(Logic), nl,
         write('---'), nl,
         maplist(draw_net, SemNets), nl,
         fail
       ).
-
 
 %Текст
 %На днях я принял участие в волонтерском проекте по помощи бездомным животным. 
