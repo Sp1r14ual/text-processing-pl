@@ -1,7 +1,7 @@
 /* -----------------------------
    Общие настройки и операторы
    ----------------------------- */
-:- use_rendering(svgtree, [list(false)]).
+:- use_rendering(svgtree, [term(true), list(false)]).
 :- dynamic глагол/1.
 :- op(100, xfy, &&).
 :- op(100, xfy, @@).
@@ -91,6 +91,10 @@ parse_logical(Atom, Logic) :-
       -> true
       ;  Logic = 'Не удалось разобрать логическую форму' ).
 
+% Визуальный вывод логической формы
+draw_logic(Logic) :-
+    write_term(Logic, [quoted(false), portray(false)]).
+
 /* -----------------------------
    2. Семантическая сеть
    ----------------------------- */
@@ -175,13 +179,15 @@ main :-
     repeat,
       write('Введите предложение (или "стоп" для выхода):'), nl,
       read_line_to_string(user_input, Sentence),
-      ( Sentence = "стоп" -> !;
-        combined_parse(Sentence, Logic, SemNets),
+      ( Sentence = "стоп" -> ! ;
+        parse_logical(Sentence, Logic),
+        tokenize_atom(Sentence, Tokens),
+        ( build_semantic_network(Tokens, SemNet) -> true ; SemNet = 'Не удалось построить семантическую сеть' ),
         write('---'), nl,
         write('Логическая форма:'), nl,
-        portray_clause(Logic), nl,
+        draw_logic(Logic), nl,
         write('---'), nl,
-        maplist(draw_net, SemNets), nl,
+        maplist(draw_net, SemNet), nl,
         fail
       ).
 
