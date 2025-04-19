@@ -16,12 +16,12 @@ tokenize_atom(Atom, Tokens) :-
 /* -----------------------------
    1. Логический разбор (GRAMMAR)
    ----------------------------- */
-% Грамматика предложений (1–5)
+% Предложения 1–5
 логПредложение(на_днях(я, принял(Obj))) -->
     [на, днях, я, принял, участие, в, волонтерском, проекте, по, помощи, бездомным, животным].
 логПредложение( &&(собрали(мы, средства(для(приюта))), помогли(мы, уход(за(животными), там))) ) -->
     [мы, собрали, средства, для, приюта, и, помогли, с, уходом, за, животными, там].
-логПредложение( &&(была(работа, тяжелой), чувствовали(мы, удовлетворение(от(того, что, делаем(мы, что_то(полезное, для(общества))))))) ) -->
+логПредложение( &&(было(работа, тяжелой), чувствовали(мы, удовлетворение(от(того, что, делаем(мы, что_то(полезное, для(общества))))))) ) -->
     [работа, была, тяжелой, но, мы, чувствовали, удовлетворение, от, того, что, делаем, что, то, полезное, для, общества].
 логПредложение( &&(поддержали(местные_жители, инициативу(нашу)), принесли(местные_жители, еду(для(животных)))) ) -->
     [местные, жители, поддержали, нашу, инициативу, и, принесли, еду, для, животных].
@@ -30,7 +30,8 @@ tokenize_atom(Atom, Tokens) :-
 
 parse_logical(Atom, Logic) :-
     tokenize_atom(Atom, Tokens),
-    ( phrase(логПредложение(Logic), Tokens, []) -> true
+    ( phrase(логПредложение(Logic), Tokens, [])
+      -> true
       ;  Logic = 'Не удалось разобрать логическую форму' ).
 
 % Визуальный вывод логической формы
@@ -115,33 +116,70 @@ combined_parse(Atom, Logic, SemNet) :-
 build_semantic_network(S,Nets) :- split_sentence(S,Parts), process_parts(Parts,S,Nets).
 
 /* -----------------------------
-   4. Главный цикл с визуализацией
+   4. Ответы на вопросы
+   ----------------------------- */
+answer_question(Tokens, SemNet) :-
+    member(кто, Tokens),
+    member(_-Links, SemNet),
+    member(agent-Agent, Links), !,
+    format('Ответ: ~w', [Agent]).
+answer_question(Tokens, SemNet) :-
+    member(что, Tokens),
+    member(_-Links, SemNet),
+    member(object-Object, Links), !,
+    format('Ответ: ~w', [Object]).
+answer_question(Tokens, SemNet) :-
+    member(где, Tokens),
+    member(_-Links, SemNet),
+    ( member(place-Place, Links) -> true ; Place = none ), !,
+    format('Ответ: ~w', [Place]).
+answer_question(Tokens, SemNet) :-
+    member(когда, Tokens),
+    member(_-Links, SemNet),
+    ( member(time-Time, Links) -> true ; Time = none ), !,
+    format('Ответ: ~w', [Time]).
+answer_question(_, _) :-
+    write('Извините, не могу ответить на этот вопрос.').
+
+/* -----------------------------
+   5. Главный цикл с визуализацией
    ----------------------------- */
 main :-
     repeat,
       write('Введите предложение (или "стоп" для выхода):'), nl,
       read_line_to_string(user_input, Sentence),
       ( Sentence = "стоп" -> ! ;
-        % Разбор логической формы и семантической сети
+        % Логический разбор
         parse_logical(Sentence, Logic),
         tokenize_atom(Sentence, Tokens),
-        ( build_semantic_network(Tokens, SemNet) -> true ; SemNet = 'Не удалось построить семантическую сеть' ),
+        % Семантическая сеть
+        ( skip_semnet(Logic) ->
+            true
+          ; ( build_semantic_network(Tokens, SemNet) -> maplist(draw_net, SemNet) ; true )
+        ),
         % Вывод логической формы
         write('---'), nl,
         write('Логическая форма:'), nl,
         draw_logic(Logic), nl,
         write('---'), nl,
-        % Условный вывод семантической сети: пропустить для 3 и 4 предложений
-        ( skip_semnet(Logic) ->
-            write(''), nl
-          ; maplist(draw_net, SemNet)
-        ), nl,
+        % Вопросы: пропустить для 3 и 4
+        ( skip_question(Logic) ->
+            true
+          ; (
+              write('Введите вопрос к предложению:'), nl,
+              read_line_to_string(user_input, Q),
+              tokenize_atom(Q, QTokens),
+              answer_question(QTokens, SemNet), nl
+            )
+        ),
         fail
       ).
 
 % Пропуск семантической сети для 3 и 4 предложений
-skip_semnet( &&(была(работа, тяжелой), _ ) ).
-skip_semnet( &&(поддержали(местные_жители, инициативу(_)), _ ) ).
+skip_semnet( &&(было(работа, тяжелой), _ ) ).
+skip_semnet( &&(поддержали(местные_жители, _), _ ) ).
+% Пропуск вопросов для 3 и 4 предложений
+skip_question(Logic) :- skip_semnet(Logic).
 
 %Текст
 %На днях я принял участие в волонтерском проекте по помощи бездомным животным.
