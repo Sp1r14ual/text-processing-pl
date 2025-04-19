@@ -93,6 +93,8 @@ time([X|S0],S0,X) :- time(X).
 place([Prep,N|S0],S0,[Prep,N]) :- prep(Prep), dop(N).
 place([Prep,A,N|S0],S0,[Prep,A,N]) :- prep(Prep), adjective(A), dop(N).
 
+object_full([с, чувством, гордости, за, свою, работу | Rest], Rest, [с, чувством, гордости, за, свою, работу]).
+
 object_full(S,S0,OF) :- object_base(S,S1,B), (object_relative(S1,S0,Rel)->OF=[B,Rel];S0=S1,OF=B).
 object_base([Det,N|S0],S0,[Det,N]) :- determiner(Det), dop(N).
 object_base([участие,в,волонтерском,проекте,по,помощи,бездомным,животным|S0],S0,[[участие,в,волонтерском,проекте],[по,помощи,бездомным,животным]]).
